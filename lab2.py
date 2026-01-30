@@ -1,6 +1,7 @@
 import streamlit as st
 from openai import OpenAI
-import fitz  # PyMuPDF
+import anthropic
+import fitz
 
 
 def extract_text_from_pdf(uploaded_pdf) -> str:
@@ -31,16 +32,15 @@ summary_type = st.sidebar.selectbox(
     ),
 )
 
-# Checkbox: model selection (required)
-use_advanced_model = st.sidebar.checkbox("Use advanced model")
+# ✅ Provider selection instead of advanced model checkbox
+provider = st.sidebar.selectbox(
+    "Choose Provider",
+    ("OpenAI", "Claude"),
+)
 
-# Pick model based on checkbox
-# (Lab says mini vs nano as an example; this keeps the required structure.)
-model_to_use = "gpt-5-chat-latest" if use_advanced_model else "gpt-5-nano"
-
-# Part B: Use Streamlit secrets (no API key text input)
+# Load API keys from Streamlit secrets
 openai_api_key = st.secrets["OPENAI_API_KEY"]
-client = OpenAI(api_key=openai_api_key)
+claude_api_key = st.secrets["CLAUDE_API_KEY"]
 
 # Upload PDF (required)
 uploaded_file = st.file_uploader("Upload a PDF", type=("pdf",))
@@ -51,22 +51,48 @@ if uploaded_file:
     # Build the instructions (Lab hint: summary type should be part of instructions)
     instructions = f"{summary_type}. Write the summary in {language}."
 
-    # Messages list (matches the OpenAI slides pattern)
-    messages = [
-        {
-            "role": "user",
-            "content": f"{instructions}\n\nHere's a document:\n{document_text}",
-        }
-    ]
+    # -----------------------------
+    # OpenAI Option
+    # -----------------------------
+    if provider == "OpenAI":
+        client = OpenAI(api_key=openai_api_key)
 
-    # Generate summary with OpenAI (slides pattern)
-    stream = client.chat.completions.create(
-        model=model_to_use,
-        messages=messages,
-        stream=True,
-    )
+        messages = [
+            {
+                "role": "user",
+                "content": f"{instructions}\n\nHere's a document:\n{document_text}",
+            }
+        ]
 
-    # Stream output
-    st.write_stream(stream)
+        stream = client.chat.completions.create(
+            model="gpt-5-chat-latest",
+            messages=messages,
+            stream=True,
+        )
+
+        st.write_stream(stream)
+
+    # -----------------------------
+    # Claude Option
+    # -----------------------------
+    elif provider == "Claude":
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        messages_to_llm = [
+            {
+                "role": "user",
+                "content": f"{instructions}\n\nHere's a document:\n{document_text}",
+            }
+        ]
+
+        response = client.messages.create(
+            model="claude-3-sonnet-20240229",
+            max_tokens=500,
+            temperature=0,
+            messages=messages_to_llm,
+        )
+
+        st.markdown(response.content[0].text)
+
 else:
     st.info("Upload a PDF to generate a summary.")
