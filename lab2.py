@@ -1,7 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 import anthropic
-import fitz
+import fitz  # PyMuPDF
 
 
 def extract_text_from_pdf(uploaded_pdf) -> str:
@@ -32,11 +32,8 @@ summary_type = st.sidebar.selectbox(
     ),
 )
 
-# ✅ Provider selection instead of advanced model checkbox
-provider = st.sidebar.selectbox(
-    "Choose Provider",
-    ("OpenAI", "Claude"),
-)
+# ✅ Checkbox model selection (required by lab wording)
+use_advanced_model = st.sidebar.checkbox("Use advanced model")
 
 # Load API keys from Streamlit secrets
 openai_api_key = st.secrets["OPENAI_API_KEY"]
@@ -48,13 +45,13 @@ uploaded_file = st.file_uploader("Upload a PDF", type=("pdf",))
 if uploaded_file:
     document_text = extract_text_from_pdf(uploaded_file)
 
-    # Build the instructions (Lab hint: summary type should be part of instructions)
+    # Lab hint: summary type should be part of instructions
     instructions = f"{summary_type}. Write the summary in {language}."
 
     # -----------------------------
-    # OpenAI Option
+    # Default model (unchecked): GPT (OpenAI)
     # -----------------------------
-    if provider == "OpenAI":
+    if not use_advanced_model:
         client = OpenAI(api_key=openai_api_key)
 
         messages = [
@@ -73,9 +70,9 @@ if uploaded_file:
         st.write_stream(stream)
 
     # -----------------------------
-    # Claude Option
+    # Advanced model (checked): Claude (Anthropic)
     # -----------------------------
-    elif provider == "Claude":
+    else:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
         messages_to_llm = [
