@@ -11,30 +11,26 @@ def extract_text_from_pdf(uploaded_pdf) -> str:
         text += page.get_text()
     return text
 
-# lab 3 part b
+# lab 3 part b + c
 def conversation_buffer(messages, keep_user_message=2):
-    """
-    Keep only the last `keep_user_messages` messages from the user
-    (and the assistant responses after them). Optionally preserves the first
-    assistant greeting if present.
-    """
-    if not messages: 
+    if not messages:
         return messages
-    
-    greeting = []
-    if messages[0]["role"] == "assistant":
-        greeting = [messages[0]]
 
-    # Find indices 
+    # keep system prompt
+    system = []
+    if messages[0]["role"] == "system":
+        system = [messages[0]]
+
+    # find user messages
     user_indices = [i for i, m in enumerate(messages) if m["role"] == "user"]
 
-    # If there are <= keep_user_messages user messages, keep everything
+    # if <= 2 user messages, keep all
     if len(user_indices) <= keep_user_message:
         return messages
 
-    # Start from the 2nd-from-last user message
+    # keep last 2 user turns + responses
     start_index = user_indices[-keep_user_message]
-    return greeting + messages[start_index:]
+    return system + messages[start_index:]
 
 st.title("Lab 3 – Chatbot with Conversational Memory")
 
@@ -64,6 +60,15 @@ if uploaded_file:
     document_text = extract_text_from_pdf(uploaded_file)
 
 instructions = f"{summary_type}. Write the summary in {language}."
+
+SYSTEM_PROMPT = (
+    "You are a helpful chatbot. "
+    "Explain things so a 10-year-old can understand. "
+    "After you answer, you must ask: 'Do you want more info?' "
+    "If the user says yes, give more information (still for a 10-year-old) "
+    "and then ask again: 'Do you want more info?' "
+    "If the user says no, say: 'Okay—what can I help you with?'"
+)
 
 # SUMMARY PAGE
 if page == "Summary":
@@ -116,9 +121,12 @@ elif page == "Chatbot":
             st.session_state.client = OpenAI(api_key=openai_api_key)
 
         if "messages" not in st.session_state:
-            st.session_state.messages = [
-                {"role": "assistant", "content": "How can I help you?"}
-            ]
+        st.session_state.messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "assistant", "content": "How can I help you?"}
+    ]
+        if "awaiting_more_info" not in st.session_state:
+        st.session_state.awaiting_more_info = False
 
         st.session_state.messages = conversation_buffer(
             st.session_state.messages, keep_user_message=2
