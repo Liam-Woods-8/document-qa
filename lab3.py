@@ -25,15 +25,15 @@ def conversation_buffer(messages, keep_user_message=2):
     if messages[0]["role"] == "assistant":
         greeting = [messages[0]]
 
-    # Find indices where role == "user"
+    # Find indices 
     user_indices = [i for i, m in enumerate(messages) if m["role"] == "user"]
 
     # If there are <= keep_user_messages user messages, keep everything
-    if len(user_indices) <= keep_user_messages:
+    if len(user_indices) <= keep_user_message:
         return messages
 
     # Start from the 2nd-from-last user message
-    start_index = user_indices[-keep_user_messages]
+    start_index = user_indices[-keep_user_message]
     return greeting + messages[start_index:]
 
 st.title("Lab 3 – Chatbot with Conversational Memory")
@@ -120,7 +120,7 @@ elif page == "Chatbot":
                 {"role": "assistant", "content": "How can I help you?"}
             ]
 
-        st.session_state.message= conversation_buffer(
+        st.session_state.messages = conversation_buffer(
             st.session_state.messages, keep_user_message=2
         )
 
@@ -134,7 +134,7 @@ elif page == "Chatbot":
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-            buffered_history= conversation_buffer(
+            buffered_history = conversation_buffer(
                 st.session_state.messages, keep_user_message=2
             )
 
@@ -143,7 +143,7 @@ elif page == "Chatbot":
                     "role": "user",
                     "content": f"{instructions}\n\nHere's a document:\n{document_text}",
                 }
-            ] + st.session_state.messages
+            ] + buffered_history
 
             client = st.session_state.client
 
@@ -161,3 +161,4 @@ elif page == "Chatbot":
             st.session_state.messages = conversation_buffer(
                 st.session_state.messages, keep_user_message=2
             )
+
