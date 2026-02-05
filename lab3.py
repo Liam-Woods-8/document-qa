@@ -32,6 +32,7 @@ def conversation_buffer(messages, keep_user_message=2):
     start_index = user_indices[-keep_user_message]
     return system + messages[start_index:]
 
+
 st.title("Lab 3 – Chatbot with Conversational Memory")
 
 # NAV 
@@ -121,52 +122,81 @@ elif page == "Chatbot":
             st.session_state.client = OpenAI(api_key=openai_api_key)
 
         if "messages" not in st.session_state:
-        st.session_state.messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "assistant", "content": "How can I help you?"}
-    ]
+            st.session_state.messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "assistant", "content": "How can I help you?"}
+            ]
+
         if "awaiting_more_info" not in st.session_state:
-        st.session_state.awaiting_more_info = False
+            st.session_state.awaiting_more_info = False
 
         st.session_state.messages = conversation_buffer(
             st.session_state.messages, keep_user_message=2
         )
 
         for msg in st.session_state.messages:
+            if msg["role"] == "system":
+                continue
             chat_msg = st.chat_message(msg["role"])
             chat_msg.write(msg["content"])
 
         if prompt := st.chat_input("What is up?"):
-            st.session_state.messages.append({"role": "user", "content": prompt})
+            normalized = prompt.strip().lower()
 
-            with st.chat_message("user"):
-                st.markdown(prompt)
+            if st.session_state.awaiting_more_info and normalized in ["no", "n", "nope", "nah"]:
+                st.session_state.messages.append({"role": "user", "content": prompt})
 
-            buffered_history = conversation_buffer(
-                st.session_state.messages, keep_user_message=2
-            )
+                with st.chat_message("user"):
+                    st.markdown(prompt)
 
-            messages_for_llm = [
-                {
-                    "role": "user",
-                    "content": f"{instructions}\n\nHere's a document:\n{document_text}",
-                }
-            ] + buffered_history
+                assistant_text = "Okay—what can I help you with?"
 
-            client = st.session_state.client
+                with st.chat_message("assistant"):
+                    st.markdown(assistant_text)
 
-            stream = client.chat.completions.create(
-                model="gpt-5-chat-latest",
-                messages=messages_for_llm,
-                stream=True,
-            )
+                st.session_state.messages.append({"role": "assistant", "content": assistant_text})
 
-            with st.chat_message("assistant"):
-                response = st.write_stream(stream)
+                st.session_state.awaiting_more_info = False
 
-            st.session_state.messages.append({"role": "assistant", "content": response})
+                st.session_state.messages = conversation_buffer(
+                    st.session_state.messages, keep_user_message=2
+                )
 
-            st.session_state.messages = conversation_buffer(
-                st.session_state.messages, keep_user_message=2
-            )
+            else:
+                st.session_state.messages.append({"role": "user", "content": prompt})
 
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                buffered_history = conversation_buffer(
+                    st.session_state.messages, keep_user_message=2
+                )
+
+                messages_for_llm = [
+                    {
+                        "role": "user",
+                        "content": f"{instructions}\n\nHere's a document:\n{document_text}",
+                    }
+                ] + buffered_history
+
+                client = st.session_state.client
+
+                stream = client.chat.completions.create(
+                    model="gpt-5-chat-latest",
+                    messages=messages_for_llm,
+                    stream=True,
+                )
+
+                with st.chat_message("assistant"):
+                    response = st.write_stream(stream)
+
+                st.session_state.messages.append({"role": "assistant", "content": response})
+
+                if normalized in ["no", "n", "nope", "nah"]:
+                    st.session_state.awaiting_more_info = False
+                else:
+                    st.session_state.awaiting_more_info = True
+
+                st.session_state.messages = conversation_buffer(
+                    st.session_state.messages, keep_user_message=2
+                )
