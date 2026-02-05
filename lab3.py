@@ -11,6 +11,30 @@ def extract_text_from_pdf(uploaded_pdf) -> str:
         text += page.get_text()
     return text
 
+# lab 3 part b
+def conversation_buffer(messages, keep_user_message=2):
+    """
+    Keep only the last `keep_user_messages` messages from the user
+    (and the assistant responses after them). Optionally preserves the first
+    assistant greeting if present.
+    """
+    if not messages: 
+        return messages
+    
+    greeting = []
+    if messages[0]["role"] == "assistant":
+        greeting = [messages[0]]
+
+    # Find indices where role == "user"
+    user_indices = [i for i, m in enumerate(messages) if m["role"] == "user"]
+
+    # If there are <= keep_user_messages user messages, keep everything
+    if len(user_indices) <= keep_user_messages:
+        return messages
+
+    # Start from the 2nd-from-last user message
+    start_index = user_indices[-keep_user_messages]
+    return greeting + messages[start_index:]
 
 st.title("Lab 3 – Chatbot with Conversational Memory")
 
@@ -83,7 +107,7 @@ if page == "Summary":
     else:
         st.info("Upload a PDF to generate a summary.")
 
-# CHATBOT PAGE (slides style)
+# CHATBOT PAGE 
 elif page == "Chatbot":
     if not uploaded_file:
         st.info("Upload a PDF to chat about it.")
@@ -96,6 +120,10 @@ elif page == "Chatbot":
                 {"role": "assistant", "content": "How can I help you?"}
             ]
 
+        st.session_state.message= conversation_buffer(
+            st.session_state.messages, keep_user_message=2
+        )
+
         for msg in st.session_state.messages:
             chat_msg = st.chat_message(msg["role"])
             chat_msg.write(msg["content"])
@@ -105,6 +133,10 @@ elif page == "Chatbot":
 
             with st.chat_message("user"):
                 st.markdown(prompt)
+
+            buffered_history= conversation_buffer(
+                st.session_state.messages, keep_user_message=2
+            )
 
             messages_for_llm = [
                 {
@@ -125,3 +157,7 @@ elif page == "Chatbot":
                 response = st.write_stream(stream)
 
             st.session_state.messages.append({"role": "assistant", "content": response})
+
+            st.session_state.messages = conversation_buffer(
+                st.session_state.messages, keep_user_message=2
+            )
