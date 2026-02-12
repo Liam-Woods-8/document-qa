@@ -81,6 +81,16 @@ def create_lab4_vectordb(pdf_folder: str):
 
     return collection
 
+def retriece_top_docs(question: str, n_results: int = 3):
+    results = st.session_state.Lab4_VectorDB.query(
+        query_texts=[question],
+        n_results=n_results,
+        include=["documents", "metadatas"],
+    )
+    docs = results["documents"][0]
+    sources = [m["source"] for m in results["metadatas"][0]]
+    return docs, sources
+
 st.title("Lab 4 – RAG")
 
 # NAV 
