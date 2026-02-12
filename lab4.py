@@ -21,7 +21,7 @@ def extract_text_from_pdf(uploaded_pdf) -> str:
     text = ""
     for page in doc:
         text += page.get_text()
-    return 
+    return text
 
 
 
@@ -81,7 +81,7 @@ def create_lab4_vectordb(pdf_folder: str):
 
     return collection
 
-def retriece_top_docs(question: str, n_results: int = 3):
+def retrieve_top_docs(question: str, n_results: int = 3):
     results = st.session_state.Lab4_VectorDB.query(
         query_texts=[question],
         n_results=n_results,
@@ -94,7 +94,7 @@ def retriece_top_docs(question: str, n_results: int = 3):
 st.title("Lab 4 – RAG")
 
 # NAV 
-page = st.sidebar.radio("Navigation", ["Summary", "Chatbot"])
+page = st.sidebar.radio("Navigation", ["Lab4","Summary", "Chatbot"])
 
 language = st.sidebar.selectbox("Language", ("English", "Spanish", "French", "Russian"))
 
@@ -129,8 +129,25 @@ SYSTEM_PROMPT = (
     "If the user says no, say: 'Okay—what can I help you with?'"
 )
 
+if page == "Lab4":
+    PDF_FOLDER = "lab4_pdfs"
+
+    if "Lab4_VectorDB" not in st.session_state:
+        st.session_state.Lab4_VectorDB = create_lab4_vectordb(PDF_FOLDER)
+
+    test_query = st.text_input("Test search (remove after you validate)", "")
+    if test_query:
+        results = st.session_state.Lab4_VectorDB.query(
+            query_texts=[test_query],
+            n_results=3,
+            include=["metadatas"],
+        )
+        st.write("Top 3 documents:")
+        for i, meta in enumerate(results["metadatas"][0], start=1):
+            st.write(f"{i}. {meta['source']}")
+
 # SUMMARY PAGE
-if page == "Summary":
+elif page == "Summary":
     if uploaded_file:
         if not use_advanced_model:
             client = OpenAI(api_key=openai_api_key)
