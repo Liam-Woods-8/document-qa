@@ -8,8 +8,8 @@ except Exception:
     pass
 
 import os
-import chomadb
-import chromadb.utils import embedding_functions
+import chromadb 
+from chromadb.utils import embedding_functions
 import streamlit as st
 from openai import OpenAI
 import anthropic
@@ -21,7 +21,9 @@ def extract_text_from_pdf(uploaded_pdf) -> str:
     text = ""
     for page in doc:
         text += page.get_text()
-    return text
+    return 
+
+
 
 # lab 3 part b + c
 def conversation_buffer(messages, keep_user_message=2):
@@ -45,7 +47,41 @@ def conversation_buffer(messages, keep_user_message=2):
     return system + messages[start_index:]
 
 
-st.title("Lab 3 – Chatbot with Conversational Memory")
+# lab 4 - RAG
+def create_lab4_vectordb(pdf_folder: str):
+    client = chromadb.PersistentClient(path="./chroma_lab4")
+
+    embed_fn = embedding_functions.OpenAIEmbeddingFunction(
+        api_key=st.secrets["OPENAI_API_KEY"],
+        model_name="text-embedding-3-small",
+    )
+
+    collection = client.get_or_create_collection(
+        name="Lab4Collection",
+        embedding_function=embed_fn,
+    )
+
+    existing = set(collection.get(include=[])["ids"])
+
+    for filename in os.listdir(pdf_folder):
+        if not filename.lower().endswith(".pdf"):
+            continue
+
+        if filename in existing:
+            continue
+
+        with open(os.path.join(pdf_folder, filename), "rb") as f:
+            text = extract_text_from_pdf(f)
+
+        collection.add(
+            ids=[filename],
+            documents=[text],
+            metadatas=[{"source": filename}],
+        )
+
+    return collection
+
+st.title("Lab 4 – RAG")
 
 # NAV 
 page = st.sidebar.radio("Navigation", ["Summary", "Chatbot"])
