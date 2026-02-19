@@ -146,132 +146,33 @@ if page == "Lab4":
         for i, meta in enumerate(results["metadatas"][0], start=1):
             st.write(f"{i}. {meta['source']}")
 
-# SUMMARY PAGE
-elif page == "Summary":
-    if uploaded_file:
-        if not use_advanced_model:
-            client = OpenAI(api_key=openai_api_key)
+    st.divider()
+    st.subheader("Course Chatbot (RAG)")
 
-            messages = [
-                {
-                    "role": "user",
-                    "content": f"{instructions}\n\nHere's a document:\n{document_text}",
-                }
-            ]
+    rag_question = st.chat_input("Ask a question about the syllabi...")
+    if rag_question:
+        docs, sources = retrieve_top_docs(rag_question, n_results=3)
 
-            stream = client.chat.completions.create(
-                model="gpt-5-chat-latest",
-                messages=messages,
-                stream=True,
-            )
+        context = "\n\n---\n\n".join(docs)
 
-            st.write_stream(stream)
-
-        else:
-            client = anthropic.Anthropic(api_key=claude_api_key)
-
-            messages_to_llm = [
-                {
-                    "role": "user",
-                    "content": f"{instructions}\n\nHere's a document:\n{document_text}",
-                }
-            ]
-
-            response = client.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=500,
-                temperature=0,
-                messages=messages_to_llm,
-            )
-
-            st.markdown(response.content[0].text)
-    else:
-        st.info("Upload a PDF to generate a summary.")
-
-# CHATBOT PAGE 
-elif page == "Chatbot":
-    if not uploaded_file:
-        st.info("Upload a PDF to chat about it.")
-    else:
-        if "client" not in st.session_state:
-            st.session_state.client = OpenAI(api_key=openai_api_key)
-
-        if "messages" not in st.session_state:
-            st.session_state.messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "assistant", "content": "How can I help you?"}
-            ]
-
-        if "awaiting_more_info" not in st.session_state:
-            st.session_state.awaiting_more_info = False
-
-        st.session_state.messages = conversation_buffer(
-            st.session_state.messages, keep_user_message=2
+        rag_prompt = (
+            "You are a course information chatbot.\n"
+            "Use the RAG context below to answer.\n"
+            "Be clear when you are using knowledge from the RAG context.\n"
+            "If the answer is not in the RAG context, say you cannot find it.\n\n"
+            f"RAG CONTEXT:\n{context}\n\n"
+            f"QUESTION:\n{rag_question}\n"
         )
 
-        for msg in st.session_state.messages:
-            if msg["role"] == "system":
-                continue
-            chat_msg = st.chat_message(msg["role"])
-            chat_msg.write(msg["content"])
+        client = OpenAI(api_key=openai_api_key)
 
-        if prompt := st.chat_input("What is up?"):
-            normalized = prompt.strip().lower()
+        stream = client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": rag_prompt}],
+            stream=True,
+        )
 
-            if st.session_state.awaiting_more_info and normalized in ["no", "n", "nope", "nah"]:
-                st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("assistant"):
+            st.write_stream(stream)
 
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-
-                assistant_text = "Okay—what can I help you with?"
-
-                with st.chat_message("assistant"):
-                    st.markdown(assistant_text)
-
-                st.session_state.messages.append({"role": "assistant", "content": assistant_text})
-
-                st.session_state.awaiting_more_info = False
-
-                st.session_state.messages = conversation_buffer(
-                    st.session_state.messages, keep_user_message=2
-                )
-
-            else:
-                st.session_state.messages.append({"role": "user", "content": prompt})
-
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-
-                buffered_history = conversation_buffer(
-                    st.session_state.messages, keep_user_message=2
-                )
-
-                messages_for_llm = [
-                    {
-                        "role": "user",
-                        "content": f"{instructions}\n\nHere's a document:\n{document_text}",
-                    }
-                ] + buffered_history
-
-                client = st.session_state.client
-
-                stream = client.chat.completions.create(
-                    model="gpt-5-chat-latest",
-                    messages=messages_for_llm,
-                    stream=True,
-                )
-
-                with st.chat_message("assistant"):
-                    response = st.write_stream(stream)
-
-                st.session_state.messages.append({"role": "assistant", "content": response})
-
-                if normalized in ["no", "n", "nope", "nah"]:
-                    st.session_state.awaiting_more_info = False
-                else:
-                    st.session_state.awaiting_more_info = True
-
-                st.session_state.messages = conversation_buffer(
-                    st.session_state.messages, keep_user_message=2
-                )
+        st.write("Sources:", sources)
